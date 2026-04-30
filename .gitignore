@@ -1,0 +1,85 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+ENV/
+
+# Secrets and environment variables
+.env
+.env.*
+*.env
+secrets/
+secrets.json
+secrets.yaml
+secrets.yml
+config/secrets*
+*.key
+*.pem
+*.crt
+api_keys.txt
+credentials*
+
+# Datasets (large files - not for git)
+dataset/raw/
+dataset/processed/
+*.csv
+*.parquet
+*.hdf5
+*.h5
+
+# Model artifacts and checkpoints
+checkpoints/
+artifacts/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.pkl
+*.pickle
+models/*.pt
+models/*.pkl
+
+# MLflow / Wandb / Experiment tracking
+mlruns/
+wandb/
+logs/
+*.log
+security_actions.log
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
