@@ -1,6 +1,6 @@
 # Cybersecurity Intrusion Detection System
 
-A deep learning-based network intrusion detection system using the CIC-IDS2017 dataset. This project implements feature pruning, Super-Class grouping, SMOTE balancing, and automated security response capabilities.
+A deep learning-based network intrusion detection system using the CIC-IDS2017 dataset. This project implements feature pruning, Super-Class grouping, SMOTE balancing, model training with artifact persistence, and automated security response capabilities.
 
 ## Overview
 
@@ -9,7 +9,9 @@ This system detects network attacks using a neural network trained on network fl
 - **Data Preprocessing**: Feature pruning from 78 to 17 golden features
 - **Super-Class Grouping**: Maps 15 micro-classes to 6 attack categories
 - **Class Balancing**: SMOTE + RandomUnderSampler for handling imbalance
-- **Model Training**: Deep learning classifier with weighted loss
+- **Model Training**: 4-layer MLP (IDS_Model) with BatchNorm, Dropout, and NLLLoss
+- **Artifact Persistence**: Saves scaler, encoder, model weights, and metrics to `artifacts/`
+- **Evaluation**: Classification reports and confusion matrix visualization
 - **Security Response**: Automated IP blocking via ResponseAgent
 
 ## Dataset
@@ -20,7 +22,7 @@ This system detects network attacks using a neural network trained on network fl
 - 78 original features pruned to 17 golden features
 
 Raw data location: `dataset/raw/`
-Processed data: `dataset/processed/golden_ids2017.csv`
+Processed data: `dataset/processed/balanced_dataset.csv`
 
 ## Super-Class Grouping
 
@@ -79,34 +81,53 @@ Process and merge raw CSV files with feature pruning and balancing:
 python scripts/run_preprocessing_pipeline.py
 ```
 
-This creates `dataset/processed/golden_ids2017.csv` with 18 columns (17 features + Label).
+This creates `dataset/processed/balanced_dataset.csv` with 18 columns (17 features + Super_Label).
 
 **Note:** Requires raw CIC-IDS2017 CSV files in `dataset/raw/` directory.
 
 ### Model Training
 
-Train the classifier with Super-Class grouping and SMOTE balancing:
+Train the IDS classifier with data loading, preprocessing, and artifact persistence:
 
 ```bash
-python scripts/train.py
+python src/model/train.py
 ```
 
-**Note:** The training script expects preprocessed data in `dataset/processed/golden_ids2017.csv`.
+**Note:** The training script expects preprocessed data in `dataset/processed/balanced_dataset.csv`.
 
-Features:
-- Automatic Super-Class grouping via `apply_super_classes()`
-- SMOTE oversampling for minority classes
-- Class weights in CrossEntropyLoss for imbalance handling
-- Saves model, scaler, and encoder to `checkpoints/` (when fully implemented)
+**Features:**
+- Data loading with `prepare_loaders()` from `src/data/loader.py`
+- StandardScaler fitted on training data, transforms both train/test
+- LabelEncoder for class mapping (0-5 → Super-Class names)
+- 80/20 train/test split with stratification
+- **IDS_Model**: 4-layer MLP (17 → 256 → 256 → 64 → 6)
+- NLLLoss with log_softmax output
+- Tracks training metrics (loss/accuracy per epoch)
+- Generates classification report and confusion matrix
+
+**Artifacts saved to `artifacts/`:**
+- `best_model.pth` - Best model weights during training
+- `ids_agent_model.pth` - Final model state dict
+- `scaler.joblib` - Fitted StandardScaler for inference
+- `label_encoder.joblib` - Fitted LabelEncoder for class names
+- `metrics.json` - Training history and testing performance
+- `confusion_matrix.png` - Visualization of test results
 
 ### Model Evaluation
 
-**Status:** Not yet implemented.
+Evaluate the trained model and generate performance metrics:
 
-Planned evaluation features:
-- Confusion matrix visualization
-- Per-class precision/recall/F1
-- ROC curves and AUC scores
+```python
+from src.model.evaluation import evaluate_model
+
+# Load model, test_loader, device, and label_encoder
+test_report = evaluate_model(model, test_loader, device, label_encoder)
+```
+
+**Features:**
+- Classification report with per-class precision/recall/F1
+- Confusion matrix heatmap visualization
+- Saved to `artifacts/confusion_matrix.png`
 
 ## Project Structure
 
@@ -115,31 +136,27 @@ cyber_security/
 ├── src/                          # Core library
 │   ├── data/
 │   │   ├── preprocessing.py      # Feature pruning and data cleaning
-│   │   ├── loader.py             # Dataset loading utilities (placeholder)
+│   │   ├── loader.py             # Data loading with preprocessing
 │   │   └── dataset.py            # PyTorch dataset classes (placeholder)
 │   ├── model/
-│   │   ├── model.py              # Neural network architecture (placeholder)
-│   │   ├── train.py              # Training loop (placeholder)
-│   │   ├── evaluation.py         # Metrics computation (placeholder)
-│   │   ├── prediction.py         # Inference utilities (placeholder)
-│   │   └── balancing.py          # Super-Class grouping & SMOTE (implemented)
+│   │   ├── model.py              # IDS_Model neural network
+│   │   ├── train.py              # Training loop with artifact persistence
+│   │   ├── evaluation.py         # Classification report & confusion matrix
+│   │   └── balancing.py          # Super-Class grouping & SMOTE
 │   ├── agents/
 │   │   └── response_agent.py     # Automated response agent
 │   ├── engine/
 │   │   └── tools.py              # Security response tools (IP blocking)
-│   ├── pipelines/
-│   │   ├── data_preprocessing.py # Pipeline orchestration (placeholder)
-│   │   ├── model_training_pipeline.py  # (placeholder)
-│   │   └── model_evaluation.py   # (placeholder)
 │   └── utils.py                  # Shared utilities
 ├── scripts/
 │   ├── run_preprocessing_pipeline.py  # Full preprocessing pipeline
 │   └── train.py                  # Model training script
 ├── dataset/
 │   ├── raw/                      # Original CIC-IDS2017 CSV files
-│   └── processed/                # Cleaned and merged data
+│   └── processed/                # Cleaned, merged, and balanced data
+├── artifacts/                    # Saved models and metrics
 ├── notebook/                     # Jupyter notebooks for experiments
-├── main.py                       # Placeholder entry point
+├── main.py                       # Entry point
 ├── pyproject.toml                # Project dependencies
 └── README.md                     # This file
 ```
@@ -164,7 +181,7 @@ df_balanced = get_balanced_data(df)
 - Pattern-based matching with `str.contains()` handles weird characters in labels
 - Preserves rare attack semantics via Super-Class grouping
 - SMOTE generates synthetic samples for minority classes
-- Class weights in loss function further address imbalance
+- Saves balanced dataset to `dataset/processed/balanced_dataset.csv`
 
 ## Security Response
 
@@ -192,6 +209,26 @@ from src.engine.tools import block_ip_tool
 # Generate iptables blocking rule
 result = block_ip_tool("192.168.1.100", "DOS_ATTACK")
 # Logs action to security_actions.log
+```
+
+## Quick Start
+
+```bash
+# 1. Setup environment
+python -m venv .venv
+source .venv/bin/activate
+uv sync
+
+# 2. Preprocess data (requires raw CIC-IDS2017 files in dataset/raw/)
+python scripts/run_preprocessing_pipeline.py
+
+# 3. Train model
+python src/model/train.py
+
+# 4. Check artifacts
+ls artifacts/
+# best_model.pth  ids_agent_model.pth  scaler.joblib
+# label_encoder.joblib  metrics.json  confusion_matrix.png
 ```
 
 ## Development
