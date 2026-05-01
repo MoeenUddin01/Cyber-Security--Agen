@@ -24,7 +24,7 @@ FEATURE_COLS = [
     "Destination Port",
     "Flow Duration",
     "Total Fwd Packets",
-    "Total Backward Packets",
+    "Total Bwd Packets",
     "Total Length of Fwd Packets",
     "Fwd Packet Length Max",
     "Fwd Packet Length Mean",
@@ -69,6 +69,7 @@ def prepare_loaders(
     # Load data
     logger.info(f"Loading data from {csv_path}")
     df = pd.read_csv(csv_path)
+    df.columns = df.columns.str.strip()  # Remove any hidden spaces
     logger.info(f"Loaded {len(df)} rows")
 
     # Verify columns exist

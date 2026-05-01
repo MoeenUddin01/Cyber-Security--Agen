@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import torch
+import yaml
 
 from src.data.loader import prepare_loaders
 from src.model.evaluation import evaluate_model
@@ -12,40 +13,45 @@ from src.model.model import IDS_Model
 from src.model.train import run_training_loop
 
 
+def load_config(config_path: str | Path = "config.yaml") -> dict:
+    """Load configuration from YAML file.
+    
+    Args:
+        config_path: Path to config.yaml file.
+        
+    Returns:
+        Configuration dictionary.
+    """
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+
 def train_model_pipeline(
-    csv_path: str | Path | None = None,
-    epochs: int = 50,
-    batch_size: int = 1024,
-    lr: float = 0.001,
-    device: str | torch.device = "auto",
+    config_path: str | Path = "config.yaml",
 ) -> dict:
     """Execute the full model training pipeline.
 
     Args:
-        csv_path: Path to the balanced_dataset.csv file.
-                   Defaults to dataset/processed/balanced_dataset.csv.
-        epochs: Number of training epochs.
-        batch_size: Batch size for training.
-        lr: Learning rate.
-        device: Device to train on ('auto', 'cuda', 'cpu', or torch.device).
+        config_path: Path to config.yaml file.
 
     Returns:
         Dictionary containing training results and metrics.
     """
+    # Load configuration
+    config = load_config(config_path)
+    
     # Setup: Create the artifacts/ directory
-    project_root = Path(__file__).parent.parent.parent
-    artifacts_dir = project_root / "artifacts"
+    project_root = Path(config["paths"]["project_root"])
+    artifacts_dir = project_root / config["paths"]["artifacts_dir"]
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine device
-    if device == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    elif isinstance(device, str):
-        device = torch.device(device)
+    # Determine device - Force CPU due to GPU compatibility issues
+    print('!!! Incompatible GPU detected. Switching to CPU for stability !!!')
+    device = torch.device('cpu')
 
     # Data: Call prepare_loaders() to get the training and testing data
-    if csv_path is None:
-        csv_path = project_root / "dataset" / "processed" / "balanced_dataset.csv"
+    csv_path = project_root / config["paths"]["balanced_dataset"]
+    batch_size = config["data"]["batch_size"]
 
     train_loader, test_loader, num_classes, label_encoder = prepare_loaders(
         csv_path, batch_size=batch_size
@@ -56,26 +62,28 @@ def train_model_pipeline(
     input_dim = sample_batch[0].shape[1]
 
     # Model: Initialize IDS_Model
+    model_config = config["model"]
     model = IDS_Model(
         input_size=input_dim,
-        num_classes=num_classes,
+        num_classes=model_config["num_classes"],
     ).to(device)
 
     # Execution: Call run_training_loop()
+    training_config = config["training"]
     training_result = run_training_loop(
         model=model,
         train_loader=train_loader,
         test_loader=test_loader,
         device=device,
-        epochs=epochs,
-        lr=lr,
+        epochs=training_config["epochs"],
+        lr=training_config["learning_rate"],
     )
 
     trained_model = training_result["model"]
     best_accuracy = training_result["best_accuracy"]
 
     # Save trained model weights
-    model_path = artifacts_dir / "ids_agent_model.pth"
+    model_path = artifacts_dir / config["artifacts"]["model_file"]
     torch.save(trained_model.state_dict(), model_path)
 
     # Evaluation: Call evaluate_model() using the trained weights

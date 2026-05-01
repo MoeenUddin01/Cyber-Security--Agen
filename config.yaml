@@ -1,0 +1,94 @@
+# Cyber Security Agent Configuration
+
+# Project paths
+paths:
+  project_root: "."
+  dataset_dir: "dataset/processed"
+  balanced_dataset: "dataset/processed/balanced_dataset.csv"
+  artifacts_dir: "artifacts"
+  models_dir: "artifacts"
+
+# Data configuration
+data:
+  batch_size: 1024
+  test_size: 0.2
+  random_state: 42
+  features:
+    - "Destination Port"
+    - "Flow Duration"
+    - "Total Fwd Packets"
+    - "Total Backward Packets"
+    - "Total Length of Fwd Packets"
+    - "Fwd Packet Length Max"
+    - "Fwd Packet Length Mean"
+    - "Fwd Packet Length Std"
+    - "Bwd Packet Length Max"
+    - "Bwd Packet Length Mean"
+    - "Bwd Packet Length Std"
+    - "Flow Bytes/s"
+    - "Flow Packets/s"
+    - "Flow IAT Mean"
+    - "Flow IAT Max"
+    - "Init_Win_bytes_forward"
+    - "Init_Win_bytes_backward"
+  target_column: "Super_Label"
+
+# Model configuration
+model:
+  name: "IDS_Model"
+  input_size: 17
+  num_classes: 6
+  architecture:
+    hidden_layers: [256, 256, 64]
+    dropout_rate: 0.3
+    activation: "relu"
+    output_activation: "log_softmax"
+
+# Training configuration
+training:
+  epochs: 50
+  learning_rate: 0.001
+  optimizer: "adam"
+  loss_function: "nll_loss"
+  device: "auto"  # auto, cuda, cpu
+  save_best_model: true
+  early_stopping:
+    enabled: false
+    patience: 10
+    min_delta: 0.001
+
+# Evaluation configuration
+evaluation:
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1_score"
+  confusion_matrix: true
+  classification_report: true
+  save_plots: true
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  save_logs: true
+  log_file: "artifacts/training.log"
+
+# Class labels for the cybersecurity dataset
+class_labels:
+  - "BENIGN"
+  - "DOS_ATTACK"
+  - "WEB_ATTACK"
+  - "BRUTE_FORCE"
+  - "INFILTRATION_GENERAL"
+  - "PortScan"
+
+# Artifacts to save
+artifacts:
+  model_file: "ids_agent_model.pth"
+  best_model_file: "best_model.pth"
+  scaler_file: "scaler.joblib"
+  label_encoder_file: "label_encoder.joblib"
+  metrics_file: "metrics.json"
+  confusion_matrix_file: "confusion_matrix.png"

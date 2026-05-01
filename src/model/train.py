@@ -22,7 +22,7 @@ def train_epoch(
     criterion: nn.Module,
     optimizer: optim.Optimizer,
     device: torch.device,
-) -> float:
+) -> tuple[float, float]:
     """Train for one epoch.
 
     Args:
@@ -33,10 +33,12 @@ def train_epoch(
         device: Device to train on.
 
     Returns:
-        Average loss for the epoch.
+        Tuple of (average loss, accuracy) for the epoch.
     """
     model.train()
     total_loss = 0.0
+    correct = 0
+    total = 0
     num_batches = 0
 
     for X_batch, y_batch in train_loader:
@@ -51,7 +53,15 @@ def train_epoch(
         total_loss += loss.item()
         num_batches += 1
 
-    return total_loss / num_batches if num_batches > 0 else 0.0
+        # Calculate accuracy
+        _, predicted = torch.max(outputs, 1)
+        total += y_batch.size(0)
+        correct += (predicted == y_batch).sum().item()
+
+    avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+    accuracy = 100.0 * correct / total if total > 0 else 0.0
+
+    return avg_loss, accuracy
 
 
 def evaluate(
@@ -123,34 +133,44 @@ def run_training_loop(
     training_metrics: dict[str, Any] = {
         "epochs": [],
         "train_loss": [],
+        "train_accuracy": [],
         "test_loss": [],
-        "accuracy": [],
+        "test_accuracy": [],
     }
 
     # Training loop
     best_accuracy = 0.0
+    best_val_acc = 0.0
     logger.info(f"Starting training for {epochs} epochs...")
 
     for epoch in range(epochs):
-        train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
-        test_loss, accuracy = evaluate(model, test_loader, criterion, device)
+        train_loss, train_accuracy = train_epoch(model, train_loader, criterion, optimizer, device)
+        test_loss, test_accuracy = evaluate(model, test_loader, criterion, device)
 
         # Track metrics
         training_metrics["epochs"].append(epoch + 1)
         training_metrics["train_loss"].append(round(train_loss, 4))
+        training_metrics["train_accuracy"].append(round(train_accuracy, 2))
         training_metrics["test_loss"].append(round(test_loss, 4))
-        training_metrics["accuracy"].append(round(accuracy, 2))
+        training_metrics["test_accuracy"].append(round(test_accuracy, 2))
 
         logger.info(
-            f"Epoch [{epoch+1}/{epochs}] "
-            f"Train Loss: {train_loss:.4f}, "
-            f"Test Loss: {test_loss:.4f}, "
-            f"Accuracy: {accuracy:.2f}%"
+            f"Epoch [{epoch+1}/{epochs}] | "
+            f"Train Loss: {train_loss:.4f} | "
+            f"Train Acc: {train_accuracy:.2f}% | "
+            f"Test Loss: {test_loss:.4f} | "
+            f"Test Acc: {test_accuracy:.2f}%"
         )
 
+        # King of the Hill: Save best model
+        if test_accuracy > best_val_acc:
+            best_val_acc = test_accuracy
+            torch.save(model.state_dict(), "artifacts/best_model.pth")
+            logger.info(f"🌟 NEW BEST MODEL SAVED! | Accuracy: {test_accuracy:.2f}% | Path: artifacts/best_model.pth")
+
         # Track best accuracy
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
+        if test_accuracy > best_accuracy:
+            best_accuracy = test_accuracy
 
     logger.info(f"Training complete. Best accuracy: {best_accuracy:.2f}%")
 
