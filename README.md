@@ -10,7 +10,6 @@ This system detects network attacks using a neural network trained on network fl
 - **Super-Class Grouping**: Maps 15 micro-classes to 6 attack categories
 - **Class Balancing**: SMOTE + RandomUnderSampler for handling imbalance
 - **Model Training**: Deep learning classifier with weighted loss
-- **API Server**: FastAPI for real-time predictions
 - **Security Response**: Automated IP blocking via ResponseAgent
 
 ## Dataset
@@ -74,13 +73,15 @@ uv sync
 
 ### Data Preprocessing
 
-Process and merge raw CSV files with feature pruning:
+Process and merge raw CSV files with feature pruning and balancing:
 
 ```bash
-python -m src.pipelines.data_preprocessing
+python scripts/run_preprocessing_pipeline.py
 ```
 
 This creates `dataset/processed/golden_ids2017.csv` with 18 columns (17 features + Label).
+
+**Note:** Requires raw CIC-IDS2017 CSV files in `dataset/raw/` directory.
 
 ### Model Training
 
@@ -90,76 +91,55 @@ Train the classifier with Super-Class grouping and SMOTE balancing:
 python scripts/train.py
 ```
 
+**Note:** The training script expects preprocessed data in `dataset/processed/golden_ids2017.csv`.
+
 Features:
 - Automatic Super-Class grouping via `apply_super_classes()`
 - SMOTE oversampling for minority classes
 - Class weights in CrossEntropyLoss for imbalance handling
-- Saves model, scaler, and encoder to `checkpoints/`
+- Saves model, scaler, and encoder to `checkpoints/` (when fully implemented)
 
 ### Model Evaluation
 
-Evaluate model performance:
+**Status:** Not yet implemented.
 
-```bash
-python -m src.pipelines.model_evaluation
-```
-
-### Run API Server
-
-Start the FastAPI server for predictions:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-### Run Streamlit Demo
-
-Launch the interactive web interface:
-
-```bash
-streamlit run app/streamlit.py
-```
+Planned evaluation features:
+- Confusion matrix visualization
+- Per-class precision/recall/F1
+- ROC curves and AUC scores
 
 ## Project Structure
 
 ```
 cyber_security/
-├── app/                          # FastAPI and Streamlit applications
-│   ├── main.py                   # FastAPI entry point
-│   ├── streamlit.py              # Web demo
-│   ├── routers/                  # API route handlers
-│   ├── schemas/                  # Pydantic models
-│   ├── dependencies.py           # Shared dependencies
-│   └── middleware.py             # Error handlers, CORS
 ├── src/                          # Core library
 │   ├── data/
 │   │   ├── preprocessing.py      # Feature pruning and data cleaning
-│   │   ├── loader.py             # Dataset loading utilities
-│   │   ├── encoder.py            # Label encoding
-│   │   └── dataset.py            # PyTorch dataset classes
+│   │   ├── loader.py             # Dataset loading utilities (placeholder)
+│   │   └── dataset.py            # PyTorch dataset classes (placeholder)
 │   ├── model/
-│   │   ├── model.py              # Neural network architecture
-│   │   ├── train.py              # Training loop
-│   │   ├── evaluation.py         # Metrics computation
-│   │   ├── prediction.py         # Inference utilities
-│   │   ├── loader.py             # Model checkpoint handling
-│   │   └── balancing.py          # Super-Class grouping & SMOTE
+│   │   ├── model.py              # Neural network architecture (placeholder)
+│   │   ├── train.py              # Training loop (placeholder)
+│   │   ├── evaluation.py         # Metrics computation (placeholder)
+│   │   ├── prediction.py         # Inference utilities (placeholder)
+│   │   └── balancing.py          # Super-Class grouping & SMOTE (implemented)
 │   ├── agents/
 │   │   └── response_agent.py     # Automated response agent
 │   ├── engine/
-│   │   └── tools.py              # Security response tools
+│   │   └── tools.py              # Security response tools (IP blocking)
 │   ├── pipelines/
-│   │   ├── data_preprocessing.py # Data pipeline orchestration
-│   │   ├── model_training_pipeline.py
-│   │   └── model_evaluation.py
+│   │   ├── data_preprocessing.py # Pipeline orchestration (placeholder)
+│   │   ├── model_training_pipeline.py  # (placeholder)
+│   │   └── model_evaluation.py   # (placeholder)
 │   └── utils.py                  # Shared utilities
 ├── scripts/
-│   └── train.py                  # Training script with balancing
-├── checkpoints/                # Saved models & artifacts
+│   ├── run_preprocessing_pipeline.py  # Full preprocessing pipeline
+│   └── train.py                  # Model training script
 ├── dataset/
 │   ├── raw/                      # Original CIC-IDS2017 CSV files
 │   └── processed/                # Cleaned and merged data
 ├── notebook/                     # Jupyter notebooks for experiments
+├── main.py                       # Placeholder entry point
 ├── pyproject.toml                # Project dependencies
 └── README.md                     # This file
 ```
