@@ -19,16 +19,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BENIGN_DOWNSAMPLE_SIZE = 500_000
-MIN_SAMPLES_PER_CLASS = 20_000
+MIN_SAMPLES_PER_CLASS = 20_000  # Boost minority classes to 20k samples
 RANDOM_STATE = 42
 
 # Super-Class regex patterns for matching attack types
 SUPER_CLASS_PATTERNS = {
     "DOS_ATTACK": r"(DDoS|DoS)",
     "WEB_ATTACK": r"Web Attack",
-    "BRUTE_FORCE": r"Patator",
-    "INFILTRATION_GENERAL": r"(Infiltration|Bot|Heartbleed)",
-    "SCANNING": r"PortScan",
+    "BRUTE_FORCE": r"(FTP-Patator|SSH-Patator)",
+    "INFILTRATION_GENERAL": r"(Bot|Infiltration|Heartbleed)",
+    "PortScan": r"PortScan",
 }
 
 
@@ -41,9 +41,9 @@ def apply_super_classes(df: DataFrame) -> DataFrame:
     Mapping rules:
         - DDoS/DoS variants -> DOS_ATTACK
         - Web Attack variants -> WEB_ATTACK
-        - Patator variants -> BRUTE_FORCE
-        - Infiltration/Bot/Heartbleed -> INFILTRATION_GENERAL
-        - PortScan -> SCANNING
+        - FTP-Patator or SSH-Patator -> BRUTE_FORCE
+        - Bot/Infiltration/Heartbleed -> INFILTRATION_GENERAL
+        - PortScan -> PortScan
         - BENIGN -> BENIGN
 
     Args:
@@ -145,7 +145,7 @@ def get_balanced_data(df: DataFrame) -> DataFrame:
     )
     X_resampled, y_resampled = rus.fit_resample(X, y)
 
-    # Then, apply SMOTE to boost minority classes to 5k
+    # Then, apply SMOTE to boost minority classes to MIN_SAMPLES_PER_CLASS
     current_counts = pd.Series(y_resampled).value_counts()
     smote_strategy = {}
 
@@ -154,7 +154,7 @@ def get_balanced_data(df: DataFrame) -> DataFrame:
             smote_strategy[cls] = MIN_SAMPLES_PER_CLASS
 
     if smote_strategy:
-        logger.info(f"  Applying SMOTE to boost classes: {smote_strategy}")
+        logger.info(f"  Applying SMOTE to boost classes to {MIN_SAMPLES_PER_CLASS}: {smote_strategy}")
         smote = SMOTE(
             sampling_strategy=smote_strategy,
             random_state=RANDOM_STATE,
