@@ -59,6 +59,41 @@ The 17 selected features for model training:
 11. Init_Win_bytes_forward/backward
 12. Label (target)
 
+## Configuration
+
+The project uses `config.yaml` for centralized configuration management:
+
+```yaml
+# Key configuration sections
+paths:
+  project_root: "."
+  balanced_dataset: "dataset/processed/balanced_dataset.csv"
+  artifacts_dir: "artifacts"
+
+data:
+  batch_size: 1024
+  test_size: 0.2
+  random_state: 42
+
+model:
+  input_size: 17
+  num_classes: 6
+  architecture:
+    hidden_layers: [256, 256, 64]
+    dropout_rate: 0.3
+
+training:
+  epochs: 50
+  learning_rate: 0.001
+  device: "auto"  # auto, cuda, cpu
+```
+
+**Benefits:**
+- **Centralized settings** - All parameters in one place
+- **Easy tuning** - Modify hyperparameters without code changes
+- **Version control** - Track configuration changes
+- **Reproducibility** - Same config = same results
+
 ## Setup
 
 ```bash
@@ -87,30 +122,49 @@ This creates `dataset/processed/balanced_dataset.csv` with 18 columns (17 featur
 
 ### Model Training
 
-Train the IDS classifier with data loading, preprocessing, and artifact persistence:
+#### Configuration-Driven Pipeline
+
+The new training pipeline uses `config.yaml` for all parameters:
+
+```bash
+python3 -m src.pipelines.model_training
+```
+
+**Features:**
+- **Configuration-driven**: All settings in `config.yaml` (paths, hyperparameters, model architecture)
+- **King of the Hill**: Automatically saves best performing model during training
+- **Comprehensive logging**: Shows both training and test accuracy per epoch
+- **Artifact persistence**: Saves scaler, encoder, model weights, and metrics
+- **CPU fallback**: Handles GPU compatibility issues automatically
+
+**Training Output:**
+```
+Epoch [X/50] | Train Loss: 0.XXX | Train Acc: XX.X% | Test Loss: 0.XXX | Test Acc: XX.X%
+🌟 NEW BEST MODEL SAVED! | Accuracy: XX.X% | Path: artifacts/best_model.pth
+```
+
+#### Legacy Training Script
+
+Direct training script (deprecated, use pipeline instead):
 
 ```bash
 python src/model/train.py
 ```
 
-**Note:** The training script expects preprocessed data in `dataset/processed/balanced_dataset.csv`.
+**Note:** Both methods expect preprocessed data in `dataset/processed/balanced_dataset.csv`.
 
-**Features:**
-- Data loading with `prepare_loaders()` from `src/data/loader.py`
-- StandardScaler fitted on training data, transforms both train/test
-- LabelEncoder for class mapping (0-5 → Super-Class names)
-- 80/20 train/test split with stratification
+**Model Architecture:**
 - **IDS_Model**: 4-layer MLP (17 → 256 → 256 → 64 → 6)
+- Batch normalization and dropout for regularization
 - NLLLoss with log_softmax output
-- Tracks training metrics (loss/accuracy per epoch)
-- Generates classification report and confusion matrix
+- 80/20 train/test split with stratification
 
 **Artifacts saved to `artifacts/`:**
-- `best_model.pth` - Best model weights during training
+- `best_model.pth` - **King of the Hill** best model weights (auto-saved)
 - `ids_agent_model.pth` - Final model state dict
 - `scaler.joblib` - Fitted StandardScaler for inference
 - `label_encoder.joblib` - Fitted LabelEncoder for class names
-- `metrics.json` - Training history and testing performance
+- `metrics.json` - Complete training history (train/test loss & accuracy)
 - `confusion_matrix.png` - Visualization of test results
 
 ### Model Evaluation
@@ -222,14 +276,20 @@ uv sync
 # 2. Preprocess data (requires raw CIC-IDS2017 files in dataset/raw/)
 python scripts/run_preprocessing_pipeline.py
 
-# 3. Train model
-python src/model/train.py
+# 3. Train model using new pipeline
+python3 -m src.pipelines.model_training
 
 # 4. Check artifacts
 ls artifacts/
 # best_model.pth  ids_agent_model.pth  scaler.joblib
 # label_encoder.joblib  metrics.json  confusion_matrix.png
 ```
+
+**Training Features:**
+- 🌟 **King of the Hill** - Auto-saves best model during training
+- 📊 **Dual metrics** - Tracks both training and test accuracy
+- ⚙️ **Config-driven** - All settings in `config.yaml`
+- 🔄 **CPU fallback** - Handles GPU compatibility automatically
 
 ## Development
 
