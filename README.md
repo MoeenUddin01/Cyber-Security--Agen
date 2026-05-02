@@ -187,6 +187,15 @@ test_report = evaluate_model(model, test_loader, device, label_encoder)
 
 ```
 cyber_security/
+├── app/                          # FastAPI web application
+│   ├── main.py                   # FastAPI application entry point
+│   ├── templates/                # HTML templates (Jinja2)
+│   │   └── index.html            # Main dashboard UI
+│   └── static/                   # Static assets
+│       ├── css/                  # Stylesheets
+│       │   └── style.css         # Custom CSS
+│       └── js/                   # JavaScript
+│           └── app.js            # Frontend logic
 ├── src/                          # Core library
 │   ├── data/
 │   │   ├── preprocessing.py      # Feature pruning and data cleaning
@@ -194,13 +203,18 @@ cyber_security/
 │   │   └── dataset.py            # PyTorch dataset classes (placeholder)
 │   ├── model/
 │   │   ├── model.py              # IDS_Model neural network
+│   │   ├── prediction.py         # Threat predictor for inference
 │   │   ├── train.py              # Training loop with artifact persistence
 │   │   ├── evaluation.py         # Classification report & confusion matrix
 │   │   └── balancing.py          # Super-Class grouping & SMOTE
 │   ├── agents/
+│   │   ├── advisor.py            # AI security advisor (Groq)
+│   │   ├── monitor.py            # System monitoring agent
 │   │   └── response_agent.py     # Automated response agent
 │   ├── engine/
 │   │   └── tools.py              # Security response tools (IP blocking)
+│   ├── pipelines/
+│   │   └── model_training.py     # Configuration-driven training pipeline
 │   └── utils.py                  # Shared utilities
 ├── scripts/
 │   ├── run_preprocessing_pipeline.py  # Full preprocessing pipeline
@@ -210,6 +224,7 @@ cyber_security/
 │   └── processed/                # Cleaned, merged, and balanced data
 ├── artifacts/                    # Saved models and metrics
 ├── notebook/                     # Jupyter notebooks for experiments
+├── config.yaml                   # Configuration file
 ├── main.py                       # Entry point
 ├── pyproject.toml                # Project dependencies
 └── README.md                     # This file
@@ -265,6 +280,68 @@ result = block_ip_tool("192.168.1.100", "DOS_ATTACK")
 # Logs action to security_actions.log
 ```
 
+## FastAPI Web Interface
+
+The project includes a **creative and modern FastAPI web interface** for real-time threat detection with an interactive dashboard.
+
+### Features
+
+- **🎨 Modern Dark Theme UI** - Beautiful gradient design with Tailwind CSS
+- **📊 Interactive Dashboard** - Real-time threat visualization with Chart.js
+- **🔍 Network Analysis** - Web form for entering 17 network features
+- **🤖 AI-Powered Advice** - Groq AI integration for security recommendations
+- **🛡️ Automated Mitigation** - IP blocking and threat response
+- **📱 Responsive Design** - Works on desktop and mobile devices
+
+### Running the Web Interface
+
+```bash
+# Start the FastAPI server
+uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Then open your browser to: **http://localhost:8000**
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Main dashboard (HTML UI) |
+| `/analyze` | POST | Analyze network data for threats |
+| `/health` | GET | System health check |
+| `/docs` | GET | Swagger API documentation |
+| `/redoc` | GET | ReDoc API documentation |
+
+### API Usage Example
+
+```bash
+# Analyze network traffic
+curl -X POST "http://localhost:8000/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "features": [443, 1000000, 50, 50, 5000, 3000, 200, 50, 100, 150, 30, 60, 10, 0.1, 50000, 10000, 100000],
+    "source_ip": "192.168.1.100"
+  }'
+```
+
+**Response:**
+```json
+{
+  "prediction": {
+    "label": "DOS_ATTACK",
+    "confidence": "85.52%",
+    "is_threat": true,
+    "threat_level": "HIGH"
+  },
+  "ai_advice": "A DOS_ATTACK floods your network with traffic to disrupt services...",
+  "mitigation_status": {
+    "blocked": true,
+    "ip": "192.168.1.100",
+    "action": "Successfully generated mitigation rule: sudo iptables -A INPUT -s 192.168.1.100 -j DROP"
+  }
+}
+```
+
 ## Quick Start
 
 ```bash
@@ -279,7 +356,10 @@ python scripts/run_preprocessing_pipeline.py
 # 3. Train model using new pipeline
 python3 -m src.pipelines.model_training
 
-# 4. Check artifacts
+# 4. Start the web interface
+uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 5. Check artifacts
 ls artifacts/
 # best_model.pth  ids_agent_model.pth  scaler.joblib
 # label_encoder.joblib  metrics.json  confusion_matrix.png

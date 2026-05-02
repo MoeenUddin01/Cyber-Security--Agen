@@ -3,8 +3,9 @@
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from jinja2 import Environment, FileSystemLoader
 import sys
 import os
 from pathlib import Path
@@ -30,9 +31,16 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Mount static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Get absolute paths
+BASE_DIR = Path(__file__).resolve().parent
+static_dir = BASE_DIR / "static"
+templates_dir = BASE_DIR / "templates"
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Initialize Jinja2 environment
+jinja_env = Environment(loader=FileSystemLoader(str(templates_dir)))
 
 # Initialize components
 try:
@@ -50,10 +58,11 @@ except Exception as e:
     advisor = None
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Serve the main dashboard page."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    template = jinja_env.get_template("index.html")
+    return template.render(request=request)
 
 
 @app.post("/analyze")

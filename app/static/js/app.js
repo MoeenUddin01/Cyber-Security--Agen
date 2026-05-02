@@ -55,8 +55,9 @@ function initializeCharts() {
             }]
         },
         options: {
-            responsive: true,
+            responsive: false,
             maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -87,8 +88,9 @@ function initializeCharts() {
             }]
         },
         options: {
-            responsive: true,
+            responsive: false,
             maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
                     labels: { color: '#9ca3af' }
