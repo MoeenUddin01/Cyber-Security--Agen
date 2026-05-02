@@ -8,8 +8,106 @@ let timelineChart = null;
 document.addEventListener('DOMContentLoaded', function() {
     initializeCharts();
     updateSystemStatus();
+    loadScenarios();
     showSection('dashboard');
 });
+
+// Load available test scenarios from API
+async function loadScenarios() {
+    try {
+        // Fetch scenario names
+        const response = await fetch('/test-scenarios');
+        const scenarios = await response.json();
+        console.log('Loaded scenarios:', scenarios);
+
+        // Fetch sample data
+        const samplesResponse = await fetch('/samples');
+        const samplesData = await samplesResponse.json();
+        testSamples = samplesData.samples || {};
+        console.log('Loaded samples:', Object.keys(testSamples));
+
+        const select = document.getElementById('scenarioSelect');
+        if (select) {
+            select.innerHTML = '<option value="">-- Select a test scenario --</option>' +
+                scenarios.map(s => `<option value="${s}">${s}</option>`).join('');
+            console.log('Dropdown populated with', scenarios.length, 'options');
+        } else {
+            console.error('scenarioSelect element not found!');
+        }
+    } catch (error) {
+        console.error('Failed to load scenarios:', error);
+    }
+}
+
+// Store samples data globally
+let testSamples = {};
+
+// Load selected scenario data
+async function loadScenario() {
+    const select = document.getElementById('scenarioSelect');
+    const scenarioName = select.value;
+    console.log('Selected scenario:', scenarioName);
+
+    if (!scenarioName) {
+        displayError('Please select a scenario first');
+        return;
+    }
+
+    // Get sample data from stored samples
+    const sample = testSamples[scenarioName];
+    console.log('Found sample:', sample);
+    if (!sample) {
+        displayError('Sample data not found');
+        return;
+    }
+
+    // Populate form with the scenario's features
+    const inputs = document.querySelectorAll('.feature-input');
+    inputs.forEach((input, index) => {
+        if (sample.features[index] !== undefined) {
+            input.value = sample.features[index];
+        }
+    });
+
+    // Set source IP
+    document.getElementById('sourceIp').value = sample.source_ip || '';
+
+    // Now run the analysis
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                features: sample.features,
+                source_ip: sample.source_ip || null
+            })
+        });
+
+        const result = await response.json();
+
+        // Display results
+        displayResults(result);
+
+        addToHistory({
+            timestamp: new Date().toISOString(),
+            features: sample.features,
+            source_ip: sample.source_ip,
+            result: result
+        });
+
+        updateCounters(result);
+
+    } catch (error) {
+        console.error('Analysis failed:', error);
+        displayError('Analysis failed. Please try again.');
+    } finally {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+}
 
 // Navigation
 function showSection(sectionName) {

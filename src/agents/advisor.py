@@ -39,19 +39,20 @@ class SecurityAdvisor:
         
         print("🤖 SecurityAdvisor initialized with Groq AI")
     
-    def get_advice(self, attack_type: str, confidence: str, features: Dict[str, Any]) -> str:
+    def get_advice(self, attack_type: str, confidence: str, features: Dict[str, Any], intel: Dict[str, Any] = None) -> str:
         """Get AI advice for detected cybersecurity threat.
         
         Args:
             attack_type: Type of attack detected (e.g., 'DOS_ATTACK', 'WEB_ATTACK')
             confidence: Confidence level of the detection (e.g., '85.52%')
             features: Dictionary of network features that triggered the detection
+            intel: IP intelligence data (provider, country, open_services)
             
         Returns:
             AI-generated advice string explaining the attack and mitigation.
         """
         # Create the prompt for Groq
-        prompt = self._create_advisor_prompt(attack_type, confidence, features)
+        prompt = self._create_advisor_prompt(attack_type, confidence, features, intel)
         
         try:
             # Get response from Groq
@@ -79,13 +80,14 @@ class SecurityAdvisor:
             print(f"⚠️ {error_msg}")
             return "Unable to generate AI advice at this time. Please check network connectivity and API key."
     
-    def _create_advisor_prompt(self, attack_type: str, confidence: str, features: Dict[str, Any]) -> str:
+    def _create_advisor_prompt(self, attack_type: str, confidence: str, features: Dict[str, Any], intel: Dict[str, Any] = None) -> str:
         """Create a detailed prompt for Groq based on attack information.
         
         Args:
             attack_type: Type of attack detected
             confidence: Confidence level
             features: Network features
+            intel: IP intelligence data
             
         Returns:
             Formatted prompt string for Groq
@@ -99,7 +101,21 @@ class SecurityAdvisor:
         flow_bytes_per_sec = features.get('Flow Bytes/s', 0)
         flow_packets_per_sec = features.get('Flow Packets/s', 0)
         
-        prompt = f"""Explain what a {attack_type} is in one sentence. Then, explain why blocking the source IP is the correct immediate response. Keep the total response under 50 words.
+        # Build IP intelligence section
+        intel_info = ""
+        if intel:
+            provider = intel.get('provider', 'Unknown')
+            country = intel.get('country', 'Unknown')
+            open_services = intel.get('open_services', [])
+            services_str = ", ".join([str(port) for port in open_services]) if open_services else "None"
+            intel_info = f"""
+
+IP Intelligence:
+- Provider: {provider}
+- Country: {country}
+- Open Services: {services_str}"""
+        
+        prompt = f"""Explain what a {attack_type} is in one sentence. Then, explain why blocking the source IP is the correct immediate response{intel_info and f', mentioning the provider ({intel.get('provider', 'Unknown')}) and country ({intel.get('country', 'Unknown')})'}. Keep the total response under 50 words.
 
 Detection Details:
 - Attack Type: {attack_type}
@@ -109,7 +125,7 @@ Detection Details:
 - Forward Packets: {fwd_packets}
 - Backward Packets: {bwd_packets}
 - Forward Data Volume: {fwd_length} bytes
-- Flow Rate: {flow_bytes_per_sec} bytes/sec, {flow_packets_per_sec} packets/sec"""
+- Flow Rate: {flow_bytes_per_sec} bytes/sec, {flow_packets_per_sec} packets/sec{intel_info}"""
         
         return prompt
     

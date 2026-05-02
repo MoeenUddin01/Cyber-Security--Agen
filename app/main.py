@@ -15,7 +15,32 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.model.prediction import ThreatPredictor
 from src.agents.advisor import SecurityAdvisor
+from src.agent.interrogator import interrogate_ip
 from src.engine.tools import block_ip_tool
+
+
+# Expanded Library: 3 samples per category
+TEST_SAMPLES = {
+    # --- BENIGN TRAFFIC ---
+    "Benign: Standard Browsing": {"features": [80, 5000, 2, 2, 100, 50, 50, 0, 50, 50, 0, 20000, 400, 2500, 5000, 255, 255], "source_ip": "192.168.1.10"},
+    "Benign: Large File Download": {"features": [443, 5000000, 100, 150, 50000, 80000, 500, 10, 800, 500, 10, 1000, 200, 500, 1000, 512, 512], "source_ip": "192.168.1.11"},
+    "Benign: Video Streaming": {"features": [443, 2000000, 50, 80, 25000, 40000, 500, 20, 500, 500, 0, 5000, 300, 800, 2000, 255, 255], "source_ip": "192.168.1.12"},
+
+    # --- DOS ATTACKS ---
+    "DoS: TCP SYN Flood": {"features": [80, 1000000, 50, 0, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 1024, 0], "source_ip": "185.156.177.42"},
+    "DoS: Slowloris (Low/Slow)": {"features": [80, 15000000, 10, 5, 500, 200, 50, 10, 40, 40, 0, 1, 0.1, 50, 100, 255, 255], "source_ip": "45.33.2.145"},
+    "DoS: High Velocity UDP": {"features": [53, 500000, 200, 200, 20000, 20000, 100, 0, 100, 100, 0, 800, 400, 100, 100, 0, 0], "source_ip": "103.212.69.5"},
+
+    # --- BRUTE FORCE ---
+    "Brute Force: SSH Password Crack": {"features": [22, 10000, 20, 20, 1500, 1500, 75, 75, 75, 75, 0, 4000, 2000, 100, 500, 255, 255], "source_ip": "190.115.18.2"},
+    "Brute Force: FTP Guessing": {"features": [21, 5000, 15, 15, 1000, 1000, 60, 60, 60, 60, 0, 6000, 3000, 100, 300, 255, 255], "source_ip": "172.217.16.142"},
+    "Brute Force: Web Admin Panel": {"features": [80, 8000, 25, 25, 2000, 2000, 80, 80, 80, 80, 0, 6250, 3125, 150, 400, 255, 255], "source_ip": "185.176.27.10"},
+
+    # --- PORT SCAN ---
+    "Port Scan: Nmap Stealth SYN": {"features": [0, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 10000, 100, 0, 0, 1024, 0], "source_ip": "5.188.62.75"},
+    "Port Scan: Fast Comprehensive": {"features": [0, 500, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20000, 1000, 0, 0, 512, 0], "source_ip": "91.241.19.12"},
+    "Port Scan: Slow FIN Scan": {"features": [0, 5000, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 50, 0, 0, 255, 0], "source_ip": "141.98.10.21"}
+}
 
 
 class NetworkData(BaseModel):
@@ -90,8 +115,17 @@ async def analyze_network_data(data: NetworkData):
             "mitigation_status": None
         }
         
-        # If threat is detected, get AI advice and perform mitigation
+        # If threat is detected, get IP intelligence, AI advice and perform mitigation
         if prediction["is_threat"]:
+            # Get IP intelligence if source IP is provided
+            ip_intel = None
+            if data.source_ip:
+                try:
+                    ip_intel = interrogate_ip(data.source_ip)
+                except Exception as e:
+                    print(f"IP interrogation failed for {data.source_ip}: {e}")
+                    ip_intel = {"provider": "Unknown", "country": "Unknown", "open_services": []}
+            
             # Get AI advice
             if advisor:
                 try:
@@ -108,13 +142,17 @@ async def analyze_network_data(data: NetworkData):
                     advice = advisor.get_advice(
                         attack_type=prediction["label"],
                         confidence=prediction["confidence"],
-                        features=features_dict
+                        features=features_dict,
+                        intel=ip_intel
                     )
                     response["ai_advice"] = advice
+                    response["ip_intel"] = ip_intel
                 except Exception as e:
                     response["ai_advice"] = f"AI Advisor error: {str(e)}"
+                    response["ip_intel"] = ip_intel
             else:
                 response["ai_advice"] = "AI Advisor not available"
+                response["ip_intel"] = ip_intel
             
             # Perform IP blocking if source_ip is provided
             if data.source_ip:
@@ -161,6 +199,38 @@ async def health_check():
         "predictor_available": predictor is not None,
         "advisor_available": advisor is not None
     }
+
+
+@app.get("/samples")
+async def get_test_samples():
+    """Get pre-defined test samples for easy API testing."""
+    return {
+        "description": "Pre-defined attack patterns for testing the API",
+        "samples": TEST_SAMPLES
+    }
+
+
+@app.get("/test-scenarios")
+async def get_scenarios():
+    """Returns the list of all available attack names for the UI."""
+    return list(TEST_SAMPLES.keys())
+
+
+@app.post("/test-scenario/{scenario_name}")
+async def run_test_scenario(scenario_name: str):
+    """
+    Pick an attack scenario from the library and run a full Guardian loop.
+    Available: benign_web_browsing, dos_flooding_attack, brute_force_ssh, port_scan_recon
+    """
+    if scenario_name not in TEST_SAMPLES:
+        raise HTTPException(status_code=404, detail="Scenario not found in library")
+    
+    # Extract pre-stored data
+    sample = TEST_SAMPLES[scenario_name]
+    
+    # Wrap it in our existing logic (same as /analyze)
+    data = NetworkData(features=sample["features"], source_ip=sample["source_ip"])
+    return await analyze_network_data(data)  # Re-uses main logic you already built!
 
 
 if __name__ == "__main__":
